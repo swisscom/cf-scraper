@@ -1,0 +1,12 @@
+applications:
+  - name: cf-scraper
+    env:
+      SYNC_SCHEDULE: "*/1 * * * *"
+    command: node index.js
+    health-check-type: process
+    disk_quota: 128M
+    memory: 128M
+    no-route: true
+    services:
+      - cf-api-credentials
+      - orgs-store
