@@ -4,7 +4,7 @@ applications:
       SYNC_SCHEDULE: "*/1 * * * *"
     command: node index.js
     health-check-type: process
-    disk_quota: 128M
+    disk_quota: 256M
     memory: 128M
     no-route: true
     services:
