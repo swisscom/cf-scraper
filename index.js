@@ -29,6 +29,30 @@ var s3Client = s3.createClient({
   }
 });
 
+function getToken(authEndpoint) {
+  return superagent
+    .post(authEndpoint + "/oauth/token")
+    .type("form")
+    .send({
+      "2factor": "",
+      grant_type: "password",
+      password: auditorCreds.password,
+      username: auditorCreds.username,
+      scope: ""
+    })
+    .set("Content-Type", "application/x-www-form-urlencoded")
+    .set("Authorization", "Basic Y2Y6")
+    .set("Accept", "application/json");
+}
+
+function getOrg(login, orgName) {
+  return superagent
+    .get(apiUrl + "/v2/organizations")
+    .set("Authorization", "Bearer " + login.body.access_token)
+    .set("Accept", "application/json")
+    .query({ q: "name:" + orgName });
+}
+
 async function scrape() {
   try {
     console.log("getting api info on " + apiUrl);
@@ -36,20 +60,7 @@ async function scrape() {
     console.log(
       "logging in using endpoint: " + info.body.authorization_endpoint
     );
-    const login = await superagent
-      .post(info.body.authorization_endpoint + "/oauth/token")
-      .type("form")
-      .send({
-        "2factor": "",
-        grant_type: "password",
-        password: auditorCreds.password,
-        username: auditorCreds.username,
-        scope: ""
-      })
-      .set("Content-Type", "application/x-www-form-urlencoded")
-      .set("Authorization", "Basic Y2Y6")
-      .set("Accept", "application/json");
-    console.log("token received");
+    const login = await getToken(info.body.authorization_endpoint);
     console.log(
       "reading org input file from local disk " + orgInputLocalFileLocation
     );
@@ -57,11 +68,7 @@ async function scrape() {
     let inputorgs = JSON.parse(rawinputorgs);
     console.log("org input file loaded");
     inputorgs.forEach(async org => {
-      var orgdata = await superagent
-        .get(apiUrl + "/v2/organizations")
-        .set("Authorization", "Bearer " + login.body.access_token)
-        .set("Accept", "application/json")
-        .query({ q: "name:" + org });
+      var orgdata = await getOrg(login, org);
       console.log(JSON.stringify(orgdata.body));
     });
   } catch (err) {
