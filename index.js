@@ -53,6 +53,28 @@ function getOrg(login, orgName) {
     .query({ q: "name:" + orgName });
 }
 
+function getResource(login, url) {
+  console.log("getting resource " + url);
+  return superagent
+    .get(apiUrl + url)
+    .set("Authorization", "Bearer " + login.body.access_token)
+    .set("Accept", "application/json");
+}
+
+async function getResourceAllPages(login, url) {
+  var result = [];
+  var firstPage = await getResource(login, url);
+  result = result.concat(firstPage.body.resources);
+  var safetyCounter = 1;
+  var page = firstPage;
+  while (page.body.next_url != null && safetyCounter < page.body.total_pages) {
+    page = await getResources(login, page.next_url);
+    result = result.concat(page.body.resources);
+    safetyCounter++;
+  }
+  return result;
+}
+
 async function scrape() {
   try {
     console.log("getting api info on " + apiUrl);
@@ -67,10 +89,39 @@ async function scrape() {
     let rawinputorgs = fs.readFileSync(orgInputLocalFileLocation);
     let inputorgs = JSON.parse(rawinputorgs);
     console.log("org input file loaded");
-    inputorgs.forEach(async org => {
-      var orgdata = await getOrg(login, org);
-      console.log(JSON.stringify(orgdata.body));
+    var orgdata = await inputorgs.map(async orgname => {
+      console.log("getting org " + orgname);
+      var org = await getOrg(login, orgname);
+      if (org.body.total_results > 0) {
+        var spaces = await getResourceAllPages(
+          login,
+          org.body.resources[0].entity.spaces_url
+        );
+        await spaces.map(async space => {
+          var apps = await getResourceAllPages(login, space.entity.apps_url);
+          await apps.map(async app => {
+            var bindings = await getResourceAllPages(
+              login,
+              app.entity.service_bindings_url
+            );
+            await bindings.map(async binding => {
+              var instance = await getResource(
+                login,
+                binding.entity.service_instance_url
+              );
+              console.log(instance.body);
+              if (instance.body.entity.type === "managed_service_instance") {
+                var service = await getResource(
+                  login,
+                  instance.body.entity.service_url
+                );
+              }
+            });
+          });
+        });
+      }
     });
+    console.log(JSON.stringify(orgdata));
   } catch (err) {
     console.error(err);
   }
