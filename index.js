@@ -4,6 +4,9 @@ const superagent = require("superagent");
 const s3 = require("s3-client");
 const orgInputLocalFileLocation = "/home/vcap/tmp/input-orgs.json";
 const scrapeResultLocalFileLocation = "/home/vcap/tmp/scrape-result.json";
+const outputBucketName = "output";
+const scrapeFileName = "scrape-result.json";
+const scrapeFileBackupName = "scrape-result-backup.json";
 const fs = require("fs");
 
 var appenv = cfenv.getAppEnv();
@@ -76,14 +79,30 @@ async function getResourceAllPages(login, url) {
   return result;
 }
 
+function backupScrapeResult(onSuccess) {
+  var params = {
+    CopySource: "/" + outputBucketName + "/" + scrapeFileName,
+    Bucket: outputBucketName,
+    Key: scrapeFileBackupName
+  };
+  var copier = s3Client.copyObject(params);
+  copier.on("error", function(err) {
+    console.error("unable to backup output file in S3", err.stack);
+  });
+  copier.on("end", function() {
+    console.log("done backing up output file in S3");
+    onSuccess();
+  });
+}
+
 function uploadScrapeResult(scrapeResult) {
   fs.writeFileSync(scrapeResultLocalFileLocation, JSON.stringify(scrapeResult));
   var params = {
     localFile: scrapeResultLocalFileLocation,
 
     s3Params: {
-      Bucket: "output",
-      Key: "scrape-result.json"
+      Bucket: outputBucketName,
+      Key: scrapeFileName
     }
   };
   var uploader = s3Client.uploadFile(params);
@@ -178,7 +197,7 @@ async function scrape() {
         }
       })
     );
-    uploadScrapeResult(scrapeResult);
+    backupScrapeResult(() => uploadScrapeResult(scrapeResult));
   } catch (err) {
     console.error(err);
   }
