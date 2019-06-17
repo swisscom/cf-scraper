@@ -3,6 +3,7 @@ const cfenv = require("cfenv");
 const superagent = require("superagent");
 const s3 = require("s3-client");
 const orgInputLocalFileLocation = "/home/vcap/tmp/input-orgs.json";
+const scrapeResultLocalFileLocation = "/home/vcap/tmp/scrape-result.json";
 const fs = require("fs");
 
 var appenv = cfenv.getAppEnv();
@@ -75,6 +76,33 @@ async function getResourceAllPages(login, url) {
   return result;
 }
 
+function uploadScrapeResult(scrapeResult) {
+  fs.writeFileSync(scrapeResultLocalFileLocation, JSON.stringify(scrapeResult));
+  var params = {
+    localFile: scrapeResultLocalFileLocation,
+
+    s3Params: {
+      Bucket: "output",
+      Key: "scrape-result.json"
+    }
+  };
+  var uploader = s3Client.uploadFile(params);
+  uploader.on("error", function(err) {
+    console.error("unable to upload scrape result to S3:", err.stack);
+  });
+  uploader.on("progress", function() {
+    console.log(
+      "progress uploading scrape result to S3",
+      uploader.progressMd5Amount,
+      uploader.progressAmount,
+      uploader.progressTotal
+    );
+  });
+  uploader.on("end", function() {
+    console.log("done uploading scrape result to S3");
+  });
+}
+
 async function scrape() {
   try {
     console.log("getting api info on " + apiUrl);
@@ -89,39 +117,68 @@ async function scrape() {
     let rawinputorgs = fs.readFileSync(orgInputLocalFileLocation);
     let inputorgs = JSON.parse(rawinputorgs);
     console.log("org input file loaded");
-    var orgdata = await inputorgs.map(async orgname => {
-      console.log("getting org " + orgname);
-      var org = await getOrg(login, orgname);
-      if (org.body.total_results > 0) {
-        var spaces = await getResourceAllPages(
-          login,
-          org.body.resources[0].entity.spaces_url
-        );
-        await spaces.map(async space => {
-          var apps = await getResourceAllPages(login, space.entity.apps_url);
-          await apps.map(async app => {
-            var bindings = await getResourceAllPages(
-              login,
-              app.entity.service_bindings_url
-            );
-            await bindings.map(async binding => {
-              var instance = await getResource(
+    var scrapeResult = {};
+    await Promise.all(
+      inputorgs.map(async orgname => {
+        console.log("getting org " + orgname);
+        var org = await getOrg(login, orgname);
+        if (org.body.total_results > 0) {
+          scrapeResult[orgname] = {};
+          var spaces = await getResourceAllPages(
+            login,
+            org.body.resources[0].entity.spaces_url
+          );
+          scrapeResult[orgname]["spaces"] = {};
+          return await Promise.all(
+            spaces.map(async space => {
+              scrapeResult[orgname]["spaces"][space.entity.name] = {};
+              var apps = await getResourceAllPages(
                 login,
-                binding.entity.service_instance_url
+                space.entity.apps_url
               );
-              console.log(instance.body);
-              if (instance.body.entity.type === "managed_service_instance") {
-                var service = await getResource(
-                  login,
-                  instance.body.entity.service_url
-                );
-              }
-            });
-          });
-        });
-      }
-    });
-    console.log(JSON.stringify(orgdata));
+              scrapeResult[orgname]["spaces"][space.entity.name]["apps"] = {};
+              return await Promise.all(
+                apps.map(async app => {
+                  scrapeResult[orgname]["spaces"][space.entity.name]["apps"][
+                    app.entity.name
+                  ] = {};
+                  var bindings = await getResourceAllPages(
+                    login,
+                    app.entity.service_bindings_url
+                  );
+
+                  scrapeResult[orgname]["spaces"][space.entity.name]["apps"][
+                    app.entity.name
+                  ]["services"] = [];
+                  return await Promise.all(
+                    bindings.map(async binding => {
+                      var instance = await getResource(
+                        login,
+                        binding.entity.service_instance_url
+                      );
+                      if (
+                        instance.body.entity.type === "managed_service_instance"
+                      ) {
+                        var service = await getResource(
+                          login,
+                          instance.body.entity.service_url
+                        );
+                        scrapeResult[orgname]["spaces"][space.entity.name][
+                          "apps"
+                        ][app.entity.name]["services"].push(
+                          service.body.entity.label
+                        );
+                      }
+                    })
+                  );
+                })
+              );
+            })
+          );
+        }
+      })
+    );
+    uploadScrapeResult(scrapeResult);
   } catch (err) {
     console.error(err);
   }
