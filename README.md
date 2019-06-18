@@ -42,8 +42,13 @@ The scraper runs as a scheduled task. The schedule is defined as a cron expressi
 6. Open `manifest.yml` and set `SYNC_SCHEDULE` to the desired cron expression (e.g. `*/15 * * * *` for "at every 15th minute").
 
 ### Push the app
-Everything else is self configuring. Just push the app.
+7. Everything else is self configuring. Just push the app.
 ````
 cf push
 ````
+
+## Collect the scrape result
+The scraper uploads the result of a scrape run to `orgs-store/output/scrape-result.json`. Before starting the upload, a backup copy of the previous result is made called `scrape-result-backup.json`.
+
+8. Download `orgs-store/output/scrape-result.json`, for example using [mc](https://github.com/minio/mc).
 
