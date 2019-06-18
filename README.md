@@ -21,7 +21,7 @@ cf cs dynstrg-2 usage orgs-store
 ````
 
 ### Load the input orgs
-The scraper uses a file called `input/input-orgs.json` in the `orgs-store` instance.
+The scraper uses a file called `input/input-orgs.json` in the `orgs-store` instance. The list can be changed at any time. The scraper will pick up the latest version when it starts the next run.
 
 4. Prepare the file `input-orgs.json` to contain an array of org names.
 ````
@@ -34,7 +34,7 @@ The scraper uses a file called `input/input-orgs.json` in the `orgs-store` insta
 ]
 ````
 
-5. Upload the file to `orgs-store/input`, for example using [mc](https://github.com/minio/mc).
+5. Upload the file to `orgs-store/input`, for example using [mc](https://github.com/minio/mc).  
 
 ### Adapt the schedule
 The scraper runs as a scheduled task. The schedule is defined as a cron expression in the environment variable `SYNC_SCHEDULE`. 
