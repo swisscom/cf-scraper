@@ -57,6 +57,12 @@ function getOrg(login, orgName) {
     .query({ q: "name:" + orgName });
 }
 
+function sleep(ms) {
+  return new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function getResource(login, url) {
   console.log("getting resource " + url);
   return superagent
@@ -139,6 +145,8 @@ async function scrape() {
     var scrapeResult = {};
     await Promise.all(
       inputorgs.map(async orgname => {
+        console.log("wait for 2 seconds between orgs");
+        await sleep(2000);
         console.log("getting org " + orgname);
         var org = await getOrg(login, orgname);
         if (org.body.total_results > 0) {
@@ -150,6 +158,8 @@ async function scrape() {
           scrapeResult[orgname]["spaces"] = {};
           return await Promise.all(
             spaces.map(async space => {
+              console.log("wait for 2 seconds between spaces");
+              await sleep(2000);
               scrapeResult[orgname]["spaces"][space.entity.name] = {};
               var apps = await getResourceAllPages(
                 login,
@@ -158,6 +168,8 @@ async function scrape() {
               scrapeResult[orgname]["spaces"][space.entity.name]["apps"] = {};
               return await Promise.all(
                 apps.map(async app => {
+                  console.log("wait for 2 seconds between apps");
+                  await sleep(2000);
                   scrapeResult[orgname]["spaces"][space.entity.name]["apps"][
                     app.entity.name
                   ] = {};
@@ -171,6 +183,10 @@ async function scrape() {
                   ]["services"] = [];
                   return await Promise.all(
                     bindings.map(async binding => {
+                      console.log(
+                        "wait for 2 seconds between service bindings"
+                      );
+                      await sleep(2000);
                       var instance = await getResource(
                         login,
                         binding.entity.service_instance_url
