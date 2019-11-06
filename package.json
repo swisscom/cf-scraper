@@ -22,7 +22,7 @@
   "homepage": "https://github.com/swisscom/cf-scraper#readme",
   "dependencies": {
     "cfenv": "^1.2.2",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.13",
     "node-schedule": "^1.3.2",
     "s3-client": "^4.4.2",
     "superagent": "^5.0.5"
